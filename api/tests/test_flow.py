@@ -159,3 +159,57 @@ def test_page_shows_kampala_time_not_utc(client):
     exp = deal.expires_at if deal.expires_at.tzinfo else deal.expires_at.replace(tzinfo=timezone.utc)
     expected = (exp + timedelta(hours=3)).strftime("%H:%M")  # Kampala = UTC+3, no DST
     assert expected in client.get(f"/pay/{token}").text
+
+
+SELLER = "256786535249"
+
+
+def _pay_and_approve(client):
+    from app.db import Payment, get_session
+
+    token = run_to_quote(client)
+    client.post(f"/pay/{token}/start", json={"msisdn": "0772123456"})
+    ref = get_session().scalar(select(Payment)).provider_ref
+    client.post(f"/dev/mock/{ref}/approve")
+    return token
+
+
+def test_seller_alerted_once_on_paid_order(client):
+    from app import seed, whatsapp as wa
+
+    seed.seed(PNID, "+256 786 535249")  # re-running seed updates the business, no duplicate
+    token = _pay_and_approve(client)
+    n_before = len(wa.OUTBOX)
+    assert client.get(f"/pay/{token}/status").json()["stage"] == "paid"
+    alerts = [m for m in wa.OUTBOX[n_before:] if m["to"] == SELLER]
+    assert len(alerts) == 1
+    body = alerts[0]["text"]["body"]
+    assert "New paid order" in body and "3 x Wireless earbuds" in body and "360,000" in body
+    assert f"+{CUSTOMER}" in body
+    # customer still got their confirmation
+    assert any(m["to"] == CUSTOMER and "Payment received" in m.get("text", {}).get("body", "") for m in wa.OUTBOX[n_before:])
+    # more polls / webhook retries do not alert again
+    client.get(f"/pay/{token}/status")
+    assert len([m for m in wa.OUTBOX[n_before:] if m["to"] == SELLER]) == 1
+
+
+def test_seller_alert_failure_never_blocks_payment(client, monkeypatch):
+    from app import seed, whatsapp as wa
+
+    seed.seed(PNID, SELLER)
+    real_send = wa._send
+
+    def flaky(pnid, to, payload):
+        if to == SELLER:
+            raise RuntimeError("131047 outside 24h window")
+        return real_send(pnid, to, payload)
+
+    token = _pay_and_approve(client)
+    monkeypatch.setattr(wa, "_send", flaky)
+    assert client.get(f"/pay/{token}/status").json()["stage"] == "paid"
+    assert any(m["to"] == CUSTOMER and "Payment received" in m.get("text", {}).get("body", "") for m in wa.OUTBOX)
+
+
+def test_no_seller_configured_is_not_an_error(client):
+    token = _pay_and_approve(client)
+    assert client.get(f"/pay/{token}/status").json()["stage"] == "paid"

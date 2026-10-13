@@ -1,17 +1,26 @@
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: orderdesk
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderdesk}
       POSTGRES_DB: orderdesk
     volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderdesk -d orderdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
   api:
     build: ./api
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://orderdesk:${POSTGRES_PASSWORD:-orderdesk}@db:5432/orderdesk
-    depends_on: [db]
+    depends_on:
+      db:
+        condition: service_healthy
     ports: ["127.0.0.1:8000:8000"]  # only Nginx on the same server can reach it
 volumes:
   pgdata:
