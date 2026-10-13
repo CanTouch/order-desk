@@ -14,6 +14,15 @@ from .config import settings
 log = logging.getLogger("orderdesk.wa")
 OUTBOX: list[dict] = []  # dry-run sink, inspected by tests
 
+# Simulator (/demo): recipients with these prefixes never reach Meta; their messages are kept in
+# memory and shown on the demo page instead.
+DEMO_PREFIXES = ("demo-", "sellerdemo-")
+DEMO_BOXES: dict[str, list[dict]] = {}
+
+
+def is_demo(to: str) -> bool:
+    return to.startswith(DEMO_PREFIXES)
+
 
 def verify_signature(raw_body: bytes, header: str | None) -> bool:
     secret = settings.wa_app_secret
@@ -28,6 +37,11 @@ def verify_signature(raw_body: bytes, header: str | None) -> bool:
 
 def _send(phone_number_id: str, to: str, payload: dict) -> None:
     body = {"messaging_product": "whatsapp", "to": to, **payload}
+    if is_demo(to):
+        box = DEMO_BOXES.setdefault(to, [])
+        box.append({"to": to, **payload})
+        del box[:-200]  # keep memory bounded
+        return
     if not settings.wa_access_token:
         OUTBOX.append({"to": to, **payload})
         log.info("DRY-RUN to=%s %s", to, payload)

@@ -11,6 +11,7 @@ from . import whatsapp as wa
 from .checkout_page import render
 from .config import settings
 from .db import Deal, Payment, get_session, init_db
+from .demo import router as demo_router
 from .flow import handle_inbound
 from .payments import get_provider
 from .service import is_expired, settle, start_push
@@ -23,6 +24,7 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Order Desk", lifespan=lifespan)
+app.include_router(demo_router)
 
 
 @app.get("/health")

@@ -44,3 +44,6 @@ No inline comments in `.env` (Docker keeps them as part of the value).
 - `DEV_MODE=0` on any public server (unsigned webhooks and /dev/mock only work with DEV_MODE=1)
 - `PAYMENT_PROVIDER=mock` until a real provider adapter exists
 - `WA_APP_SECRET` is required for webhooks to be accepted when DEV_MODE=0
+
+## Demo simulator (no Meta needed)
+Set `DEMO_MODE=1` in `.env` and recreate the api. Open `https://<your-domain>/demo`: a WhatsApp-style chat that runs the real bot flow, the real Pay Now page and the real paid-order logic. Messages to `demo-...` recipients stay in memory and never reach Meta. The "Approve payment (test)" button stands in for the PIN prompt and works only with `PAYMENT_PROVIDER=mock`. The page is public while it is on, so set `DEMO_MODE=0` after the demo.

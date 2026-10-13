@@ -89,6 +89,8 @@ def notify_seller(deal: Deal) -> None:
     """
     biz = deal.business
     seller = (biz.config or {}).get("seller_wa_id")
+    if deal.contact.wa_id.startswith(wa.DEMO_PREFIXES):
+        seller = "sellerdemo-" + deal.contact.wa_id  # simulator: show the alert on the demo page
     if not seller:
         log.warning("No seller_wa_id for business %s: seller not notified of %s", biz.id, deal.quote_ref)
         return

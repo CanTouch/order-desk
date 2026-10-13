@@ -46,5 +46,10 @@ class Settings:
     def dev_mode(self) -> bool:
         return os.getenv("DEV_MODE", "1") == "1"
 
+    @property
+    def demo_mode(self) -> bool:
+        """Turns on the /demo chat simulator. Off unless DEMO_MODE=1."""
+        return os.getenv("DEMO_MODE", "0") == "1"
+
 
 settings = Settings()
